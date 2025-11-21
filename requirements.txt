@@ -1,0 +1,20 @@
+# Core dependencies
+numpy>=1.24.0
+pyyaml>=6.0
+biopython>=1.81
+
+# Chemistry
+rdkit>=2023.9.1
+
+# Visualization (optional)
+py3Dmol>=2.0.0
+
+# Testing
+pytest>=7.4.0
+pytest-cov>=4.1.0
+
+# Type checking
+mypy>=1.5.0
+
+# Code formatting
+black>=23.0.0
