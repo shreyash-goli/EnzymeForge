@@ -1,0 +1,47 @@
+# Quorum Sensing Disruptor Enzyme Design Configuration
+
+output_dir: "results/quorum_sensing_example"
+
+substrate:
+  name: "AHL"
+  # N-acyl homoserine lactone (AHL) - bacterial quorum sensing molecule
+  structure: "CCCCCCCC(=O)NC(CCC(=O)O)C(=O)O"  # Example AHL SMILES
+  format: "smiles"
+  pdb_path: null
+
+active_site:
+  mechanism: "lactonase"  # Lactone ring opening
+  catalytic_residues: ["HIS", "HIS", "ASP"]  # Metallo-beta-lactamase fold
+
+scaffold_size: [120, 180]
+motif_positions: [60, 61, 62]
+
+diffusion:
+  iterations: 80
+  num_designs: 15
+  guide_potentials: null
+  guide_scale: 1.0
+
+sequence:
+  num_seqs: 8
+  temperature: 0.1
+
+validation:
+  rmsd_cutoff: 2.0
+  num_models: 2
+  num_recycles: 3
+
+folding:
+  num_recycles: 3
+  num_models: 2
+  msa_mode: "single_sequence"
+
+# Quorum sensing specific
+enzyme_properties:
+  target_pH: 7.0
+  target_temp: 310  # Body temperature (37°C in Kelvin) for biomedical applications
+  stability_requirement: "medium"
+  expression_system: "E.coli"
+  applications:
+    - "biofilm_prevention"
+    - "antibiotic_resistance_mitigation"

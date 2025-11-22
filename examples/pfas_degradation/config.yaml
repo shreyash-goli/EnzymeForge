@@ -1,0 +1,44 @@
+# PFAS Degradation Enzyme Design Configuration
+
+output_dir: "results/pfas_example"
+
+substrate:
+  name: "PFOA"
+  # Perfluorooctanoic acid (PFOA) SMILES
+  structure: "C(=O)(O)C(F)(F)C(F)(F)C(F)(F)C(F)(F)C(F)(F)C(F)(F)F"
+  format: "smiles"
+  pdb_path: null  # No existing complex available
+
+active_site:
+  mechanism: "dehalogenation"  # Target C-F bond breaking
+  catalytic_residues: ["ASP", "ARG", "TRP"]  # Haloalkane dehalogenase-like
+
+scaffold_size: [150, 200]  # Larger scaffold for PFAS binding pocket
+motif_positions: [75, 76, 77]  # Place in middle of protein
+
+diffusion:
+  iterations: 100  # More iterations for challenging substrate
+  num_designs: 20  # Generate more candidates
+  guide_potentials: null  # Auto-generated for substrate binding
+  guide_scale: 1.5  # Stronger guidance for fluorinated substrate
+
+sequence:
+  num_seqs: 8
+  temperature: 0.1
+
+validation:
+  rmsd_cutoff: 2.0
+  num_models: 2
+  num_recycles: 3
+
+folding:
+  num_recycles: 3
+  num_models: 2
+  msa_mode: "single_sequence"
+
+# PFAS-specific parameters
+enzyme_properties:
+  target_pH: 7.0
+  target_temp: 298  # Room temperature (Kelvin)
+  stability_requirement: "high"  # Must be stable in environmental conditions
+  expression_system: "E.coli"

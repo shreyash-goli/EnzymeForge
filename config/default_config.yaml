@@ -1,0 +1,36 @@
+# EnzymeForge Default Configuration
+
+output_dir: "results/default"
+
+substrate:
+  name: "example_substrate"
+  structure: "CCO"  # SMILES string or path to PDB
+  format: "smiles"  # "smiles", "pdb", or "mol2"
+  pdb_path: null  # Optional: if you have substrate complex PDB
+
+active_site:
+  mechanism: "hydrolysis"  # "hydrolysis", "oxidation", "reduction", "lactonase", "dehalogenation"
+  catalytic_residues: ["SER", "HIS", "ASP"]
+
+scaffold_size: [100, 150]  # (min, max) total residues
+motif_positions: [50, 51, 52]  # Where to place catalytic residues
+
+diffusion:
+  iterations: 50
+  num_designs: 10
+  guide_potentials: null  # Will be auto-generated
+  guide_scale: 1.0
+
+sequence:
+  num_seqs: 8  # Sequences per backbone
+  temperature: 0.1  # LigandMPNN sampling temperature
+
+validation:
+  rmsd_cutoff: 2.0  # Max RMSD for motif (Angstroms)
+  num_models: 2  # AlphaFold2 models to use
+  num_recycles: 3  # AlphaFold2 recycles
+
+folding:
+  num_recycles: 3
+  num_models: 2
+  msa_mode: "single_sequence"
