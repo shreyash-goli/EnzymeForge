@@ -1,3 +1,13 @@
 """Sequence design modules"""
 
-__all__ = []
+from enzymeforge.sequence.ligandmpnn_runner import (
+    LigandMPNNRunner,
+    SequenceDesignConfig,
+    SequenceDesignResult,
+)
+
+__all__ = [
+    "LigandMPNNRunner",
+    "SequenceDesignConfig",
+    "SequenceDesignResult",
+]
