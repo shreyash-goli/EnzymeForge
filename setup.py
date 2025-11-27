@@ -29,7 +29,7 @@ setup(
     install_requires=requirements,
     entry_points={
         "console_scripts": [
-            "enzymeforge=enzymeforge.pipeline:main",
+            "enzymeforge=enzymeforge.cli:main",
         ],
     },
 )
