@@ -39,6 +39,9 @@ class SequenceDesignConfig:
         number_of_packs_per_design: Packing attempts per design (default: 1)
         repack_everything: Repack all residues vs. only designed (default: False)
         zero_indexed: Use zero-indexed residue numbering (default: True)
+        relax_design_cycles: Number of FastRelax+Design cycles (default: 0)
+        params_file: Rosetta params file for ligand (optional)
+        cst_file: Rosetta constraint file (optional)
     """
     model_type: str = "ligand_mpnn"
     num_seqs: int = 4
@@ -49,6 +52,9 @@ class SequenceDesignConfig:
     number_of_packs_per_design: int = 1
     repack_everything: bool = False
     zero_indexed: bool = True
+    relax_design_cycles: int = 0
+    params_file: Optional[Path] = None
+    cst_file: Optional[Path] = None
 
 
 @dataclass
@@ -185,6 +191,213 @@ class LigandMPNNRunner:
 
         logger.info(f"Generated {len(results)} sequence design results")
         return results
+
+    def run_design_with_relax(
+        self,
+        design_pdbs: List[Path],
+        config: SequenceDesignConfig,
+        contig_str: str,
+        reference_pdb: Path,
+        ligand_name: str,
+        output_dir: Path,
+        name: str,
+        rmsd_cutoff: float = 2.0,
+        clash_cutoff: float = 2.0
+    ) -> List[SequenceDesignResult]:
+        """Run iterative FastRelax + sequence design cycles
+
+        Adapted from ProtDesign2's relax_and_design() workflow.
+
+        Args:
+            design_pdbs: List of design PDB files from RFdiffusion
+            config: Sequence design configuration (must have relax_design_cycles > 0)
+            contig_str: Contig string (for motif extraction)
+            reference_pdb: Reference PDB with motif
+            ligand_name: Substrate/ligand name
+            output_dir: Output directory
+            name: Experiment name
+            rmsd_cutoff: RMSD threshold for filtering (Angstroms)
+            clash_cutoff: Clash distance threshold (Angstroms)
+
+        Returns:
+            List of SequenceDesignResult objects from all cycles
+
+        Example:
+            >>> runner = LigandMPNNRunner(Path("/path/to/LigandMPNN"))
+            >>> config = SequenceDesignConfig(
+            ...     num_seqs=8,
+            ...     relax_design_cycles=2,
+            ...     params_file=Path("ligand.params"),
+            ...     cst_file=Path("constraints.cst")
+            ... )
+            >>> results = runner.run_design_with_relax(...)
+        """
+        if config.relax_design_cycles == 0:
+            logger.warning("relax_design_cycles=0, using standard design without relaxation")
+            return self.run_design(
+                design_pdbs=design_pdbs,
+                config=config,
+                contig_str=contig_str,
+                reference_pdb=reference_pdb,
+                ligand_name=ligand_name,
+                output_dir=output_dir,
+                name=name,
+                rmsd_cutoff=rmsd_cutoff,
+                clash_cutoff=clash_cutoff,
+                filter_first=True
+            )
+
+        # Import RosettaRunner
+        try:
+            from enzymeforge.relax.rosetta_runner import RosettaRunner, RelaxConfig
+        except ImportError:
+            raise ImportError(
+                "FastRelax requires PyRosetta. "
+                "Install with: pip install pyrosetta"
+            )
+
+        logger.info(f"Running {config.relax_design_cycles} cycles of FastRelax + SequenceDesign")
+
+        # Extract motifs
+        design_motif, ref_motif, _ = get_motifs(contig_str)
+
+        # Initialize Rosetta runner
+        rosetta_runner = RosettaRunner()
+        relax_config = RelaxConfig(
+            params_file=config.params_file,
+            cst_file=config.cst_file
+        )
+
+        # Cycle 0: Initial sequence design
+        logger.info("=" * 80)
+        logger.info("[Cycle 0] Initial sequence design")
+        logger.info("=" * 80)
+
+        cycle0_dir = output_dir / "Recycle-0"
+        cycle0_results = self.run_design(
+            design_pdbs=design_pdbs,
+            config=config,
+            contig_str=contig_str,
+            reference_pdb=reference_pdb,
+            ligand_name=ligand_name,
+            output_dir=cycle0_dir,
+            name=name,
+            rmsd_cutoff=rmsd_cutoff,
+            clash_cutoff=clash_cutoff,
+            filter_first=True
+        )
+
+        all_results = cycle0_results
+
+        # Get packed PDB files for relaxation
+        packed_dir = cycle0_dir / "outputs" / "packed"
+        if not packed_dir.exists():
+            logger.warning(f"No packed structures found at {packed_dir}")
+            return all_results
+
+        # Iterative cycles
+        for cycle in range(1, config.relax_design_cycles + 1):
+            logger.info("=" * 80)
+            logger.info(f"[Cycle {cycle}] FastRelax + SequenceDesign")
+            logger.info("=" * 80)
+
+            cycle_dir = output_dir / f"Recycle-{cycle}"
+            cycle_dir.mkdir(parents=True, exist_ok=True)
+
+            # Get PDB files to relax
+            packed_pdbs = list(packed_dir.glob("*.pdb"))
+            if not packed_pdbs:
+                logger.warning(f"No packed structures found for cycle {cycle}")
+                break
+
+            logger.info(f"Relaxing {len(packed_pdbs)} structures")
+
+            # Run FastRelax
+            relax_results = rosetta_runner.run_relax_cycle(
+                pdb_files=packed_pdbs,
+                config=relax_config,
+                design_motif=design_motif,
+                ref_motif=ref_motif,
+                ligand_name=ligand_name,
+                output_dir=cycle_dir,
+                cycle_number=cycle
+            )
+
+            # Get relaxed PDBs
+            relaxed_dir = cycle_dir / "relaxed"
+            relaxed_pdbs = [r.pdb_path for r in relax_results]
+
+            if not relaxed_pdbs:
+                logger.warning(f"No relaxed structures for cycle {cycle}")
+                break
+
+            # Run sequence design on relaxed structures
+            # Use num_seqs=1 for FastRelax cycles (as in ProtDesign2)
+            cycle_config = SequenceDesignConfig(
+                model_type=config.model_type,
+                num_seqs=1,
+                temperature=config.temperature,
+                seed=config.seed,
+                pack_side_chains=config.pack_side_chains,
+                pack_with_ligand_context=config.pack_with_ligand_context,
+                number_of_packs_per_design=config.number_of_packs_per_design,
+                repack_everything=config.repack_everything,
+                zero_indexed=config.zero_indexed
+            )
+
+            cycle_results = self.run_design(
+                design_pdbs=relaxed_pdbs,
+                config=cycle_config,
+                contig_str=contig_str,
+                reference_pdb=reference_pdb,
+                ligand_name=ligand_name,
+                output_dir=cycle_dir,
+                name=name,
+                rmsd_cutoff=rmsd_cutoff,
+                clash_cutoff=clash_cutoff,
+                filter_first=False  # Already relaxed, no need to filter
+            )
+
+            all_results.extend(cycle_results)
+
+            # Update packed_dir for next cycle
+            packed_dir = cycle_dir / "outputs" / "packed"
+
+        # Merge all FASTA files
+        self._concat_fasta_files(output_dir, name)
+
+        logger.info(f"Completed {config.relax_design_cycles} FastRelax cycles")
+        logger.info(f"Total sequences generated: {sum(len(r.sequences) for r in all_results)}")
+
+        return all_results
+
+    def _concat_fasta_files(self, output_dir: Path, name: str) -> Path:
+        """Concatenate FASTA files from all cycles
+
+        Args:
+            output_dir: Base output directory
+            name: Experiment name
+
+        Returns:
+            Path to concatenated FASTA file
+        """
+        all_lines = []
+        fasta_files = sorted(output_dir.glob("Recycle-*/outputs/seqs/*_c*.fa"))
+
+        logger.info(f"Concatenating {len(fasta_files)} FASTA files")
+
+        for fasta in fasta_files:
+            with open(fasta, 'r') as f:
+                lines = f.readlines()
+                all_lines.extend(lines)
+
+        # Write concatenated file
+        output_path = output_dir / f"{name}_all_cycles.fa"
+        with open(output_path, 'w') as f:
+            f.writelines(all_lines)
+
+        logger.info(f"Concatenated FASTA: {output_path}")
+        return output_path
 
     def _filter_designs(
         self,
