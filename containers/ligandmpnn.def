@@ -1,0 +1,66 @@
+Bootstrap: docker
+From: nvcr.io/nvidia/cuda:11.6.2-cudnn8-devel-ubuntu20.04
+
+%labels
+    Maintainer EnzymeForge
+    Description LigandMPNN + Rosetta FastRelax for sequence design
+    Version 1.0
+
+%environment
+    export DEBIAN_FRONTEND=noninteractive
+    export PYTHONUNBUFFERED=1
+    export PATH=/opt/LigandMPNN:$PATH
+
+%post
+    # Update and install system dependencies
+    apt-get update && apt-get install -y --no-install-recommends \
+        wget \
+        ca-certificates \
+        git \
+        build-essential \
+        curl \
+        python3.9 \
+        python3.9-venv \
+        python3.9-dev \
+        python3-pip
+
+    # Upgrade pip
+    python3.9 -m pip install -q -U --no-cache-dir pip setuptools wheel
+
+    # Install PyTorch and core dependencies
+    pip install -q --no-cache-dir \
+        torch==2.2.1 \
+        biopython==1.79 \
+        numpy==1.23.5 \
+        scipy==1.12.0 \
+        ProDy==2.4.1 \
+        ml-collections==0.1.1 \
+        dm-tree==0.1.8
+
+    # Install pdb2pqr
+    pip install -q --no-cache-dir pdb2pqr==3.6.2
+
+    # Install PyRosetta
+    pip install -q --no-cache-dir pyrosetta-installer==0.1.1
+    python3.9 -c 'import pyrosetta_installer; pyrosetta_installer.install_pyrosetta()'
+
+    # Clone LigandMPNN
+    cd /opt
+    git clone https://github.com/dauparas/LigandMPNN.git
+
+    # Cleanup
+    apt-get autoremove -y
+    apt-get clean
+    rm -rf /var/lib/apt/lists/*
+
+%runscript
+    exec /bin/bash "$@"
+
+%help
+    LigandMPNN + Rosetta FastRelax container for EnzymeForge sequence design.
+
+    Usage:
+        singularity exec --nv ligandmpnn.sif python script.py
+
+    Mount data:
+        singularity exec --nv -B /data:/data ligandmpnn.sif python script.py

@@ -1,0 +1,89 @@
+version: '3.8'
+
+services:
+  # Development environment
+  dev:
+    image: enzymeforge/dev:latest
+    build:
+      context: ..
+      dockerfile: containers/Dockerfile.dev
+    container_name: enzymeforge-dev
+    volumes:
+      - ..:/workspace
+      - data:/data
+      - models:/models
+    working_dir: /workspace
+    stdin_open: true
+    tty: true
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+
+  # RFdiffusion service
+  rfdiffusion:
+    image: enzymeforge/rfdiffusion:latest
+    build:
+      context: ..
+      dockerfile: containers/Dockerfile.rfdiffusion
+    container_name: enzymeforge-rfdiffusion
+    volumes:
+      - ..:/workspace
+      - data:/data
+      - models:/models
+    working_dir: /workspace
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+
+  # LigandMPNN + Rosetta service
+  ligandmpnn:
+    image: enzymeforge/ligandmpnn:latest
+    build:
+      context: ..
+      dockerfile: containers/Dockerfile.ligandmpnn
+    container_name: enzymeforge-ligandmpnn
+    volumes:
+      - ..:/workspace
+      - data:/data
+      - models:/models
+    working_dir: /workspace
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+
+  # Jupyter notebook server
+  jupyter:
+    image: enzymeforge/dev:latest
+    container_name: enzymeforge-jupyter
+    volumes:
+      - ..:/workspace
+      - data:/data
+    working_dir: /workspace
+    ports:
+      - "8888:8888"
+    command: jupyter notebook --ip=0.0.0.0 --port=8888 --no-browser --allow-root
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+
+volumes:
+  data:
+    driver: local
+  models:
+    driver: local
