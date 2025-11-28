@@ -1,0 +1,188 @@
+# Quorum Sensing Lactonase Design
+# Design an enzyme to hydrolyze N-acyl homoserine lactones (AHL)
+# for quorum quenching applications
+#
+# Catalytic mechanism: Ester hydrolysis
+# Target: Lactone ring opening
+# Reference: Natural lactonase scaffold
+
+name: "ahl_lactonase"
+output_dir: "outputs/quorum_sensing"
+
+# Substrate configuration
+substrate:
+  # N-(3-oxododecanoyl)-L-homoserine lactone (3-oxo-C12-HSL)
+  smiles: "CCCCCCCCCC(=O)CC(=O)N[C@@H]1CCOC1=O"
+  name: "3OC12HSL"
+  pdb_file: "data/substrates/3oc12hsl.pdb"
+
+  functional_groups:
+    - "lactone"
+    - "amide"
+    - "ketone"
+
+  # Catalytic mechanism
+  mechanism: "ester_hydrolysis"
+  target_bonds:
+    - ["C_lactone", "O_lactone"]  # Lactone C-O bond
+
+# Active site configuration
+active_site:
+  # Reference lactonase structure
+  reference_pdb: "data/references/aiia_lactonase.pdb"
+  reference_chain: "A"
+
+  # Catalytic triad
+  motif_residues:
+    - "A114"  # Nucleophile (Ser/Cys)
+    - "A198"  # General base (His/Asp)
+    - "A225"  # Oxyanion hole (Asn/Tyr)
+
+  catalytic_residues:
+    nucleophile: ["SER", "THR"]
+    general_base: ["HIS", "ASP", "GLU"]
+    oxyanion_hole: ["ASN", "TYR", "GLN"]
+
+  # Binding pocket
+  pocket:
+    hydrophobic: true  # For acyl chain
+    charged: false
+    polar: true  # For lactone/amide interactions
+
+  # Specificity determinants
+  specificity:
+    acyl_chain_length: 12  # Prefer C12 over shorter chains
+    selectivity_residues:
+      - "A160"  # Hydrophobic residue for acyl chain
+      - "A180"  # Shape complementarity
+
+# Scaffold configuration
+scaffold:
+  min_size: 180
+  max_size: 250
+  target_size: 215
+
+  secondary_structure:
+    alpha_helix: 0.5
+    beta_sheet: 0.2
+    loop: 0.3
+
+  topology: "alpha_beta_alpha"  # TIM barrel-like
+
+# RFdiffusion configuration
+diffusion:
+  # Use base RFdiffusion (backbone only)
+  type: "base"
+
+  num_designs: 150
+  iterations: 75
+  noise_scale: 1.2
+
+  # Use ActiveSite checkpoint for better active site design
+  checkpoint: "ActiveSite_ckpt.pt"
+
+  # Enzyme-specific guide potentials
+  enzyme_design: true
+  guide_potentials:
+    - type: "substrate_contacts"
+      weight: 8.0
+      min_contacts: 10
+      max_distance: 4.0
+      residues: ["A114", "A198", "A225"]  # Catalytic residues
+
+    - type: "catalytic_geometry"
+      weight: 15.0
+      # Ideal geometry for lactonase
+      target_distance: 3.2  # Ser-lactone distance
+      target_angle: 105.0  # Nucleophilic attack angle
+      tolerance: 0.3
+
+    - type: "binding_pocket"
+      weight: 5.0
+      pocket_volume: 1200  # Larger for C12 chain
+      hydrophobic_ratio: 0.7  # High for acyl chain
+
+    - type: "secondary_structure"
+      weight: 2.0
+      # Prefer beta-strand near active site for stability
+      target_ss: "EEE"
+      residue_range: [112, 116]
+
+# Sequence design configuration
+sequence_design:
+  model_type: "ligand_mpnn"
+  num_sequences: 15
+  temperature: 0.15
+  seed: 123
+
+  # Stricter filtering for specificity
+  filtering:
+    motif_rmsd_cutoff: 1.5
+    clash_cutoff: 1.8
+    min_substrate_contacts: 8
+
+  # Multiple FastRelax cycles for refinement
+  relax_design_cycles: 3
+
+  # Rosetta constraints
+  params_file: "data/params/3oc12hsl.params"
+  cst_file: "data/constraints/lactonase.cst"
+
+  # Design only non-motif residues
+  fixed_residues: ["A114", "A198", "A225", "A160", "A180"]
+
+# Structure prediction configuration
+folding:
+  num_recycles: 5
+  num_models: 5
+  msa_mode: "single_sequence"
+
+  # Quality thresholds
+  min_plddt: 75
+  min_pae: 8
+
+  # Additional metrics
+  metrics:
+    - "active_site_plddt"  # pLDDT of catalytic residues
+    - "pocket_volume"
+    - "substrate_rmsd"
+
+# Computational resources
+compute:
+  rfdiffusion_path: "/opt/RFdiffusion"
+  ligandmpnn_path: "/opt/LigandMPNN"
+  colabfold_command: "colabfold_batch"
+  num_workers: 12  # More workers for larger design set
+
+# Validation and scoring
+validation:
+  # Compute binding affinity (if docking available)
+  run_docking: false
+
+  # Compute stability metrics
+  compute_stability: true
+
+  # Check catalytic geometry
+  check_geometry: true
+  geometry_thresholds:
+    nucleophile_distance: [2.8, 3.6]  # Angstrom
+    attack_angle: [95, 115]  # Degrees
+
+# Output configuration
+output:
+  save_intermediates: true
+  save_plots: true
+  top_designs: 15
+
+  # Export for experimental testing
+  export_formats:
+    - "pdb"
+    - "fasta"
+    - "genbank"  # For gene synthesis
+
+  # Generate reports
+  reports:
+    - "design_summary"
+    - "sequence_analysis"
+    - "structure_quality"
+    - "catalytic_geometry"

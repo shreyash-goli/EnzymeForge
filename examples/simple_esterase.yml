@@ -1,0 +1,62 @@
+# Simple Esterase Design (Minimal Configuration)
+# Beginner-friendly example for designing a basic esterase
+#
+# This config uses minimal settings with sensible defaults.
+# Great for getting started with EnzymeForge!
+
+name: "simple_esterase"
+output_dir: "outputs/esterase"
+
+# Substrate: Simple ethyl acetate
+substrate:
+  smiles: "CCOC(=O)C"  # Ethyl acetate
+  name: "ETA"
+
+  # Mechanism is auto-detected from functional groups
+  functional_groups:
+    - "ester"
+
+# Active site: Use auto-suggestion
+active_site:
+  # Let EnzymeForge suggest catalytic residues
+  auto_suggest: true
+
+  # Or manually specify a minimal catalytic dyad
+  motif_residues:
+    - "A50"   # Serine nucleophile
+    - "A85"   # Histidine base
+
+# Scaffold: Default medium-sized protein
+scaffold:
+  target_size: 150
+
+# Diffusion: Basic settings
+diffusion:
+  type: "base"
+  num_designs: 50
+
+  # Use default guide potentials for enzyme design
+  enzyme_design: true
+
+# Sequence design: Keep it simple
+sequence_design:
+  model_type: "ligand_mpnn"
+  num_sequences: 5
+
+  # No FastRelax (faster, good for initial exploration)
+  relax_design_cycles: 0
+
+# Folding: Quick validation
+folding:
+  num_models: 3
+  msa_mode: "single_sequence"
+
+# Compute: Use defaults
+compute:
+  rfdiffusion_path: "/opt/RFdiffusion"
+  ligandmpnn_path: "/opt/LigandMPNN"
+
+# Output: Save top 5 designs
+output:
+  top_designs: 5
+  save_plots: true

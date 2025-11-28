@@ -1,0 +1,69 @@
+# EnzymeForge SLURM Cluster Configuration
+#
+# This file configures SLURM job parameters and container paths
+# for running EnzymeForge pipelines on HPC clusters.
+
+# Global cluster settings
+cluster:
+  partition: "gpu"              # SLURM partition to use
+  email: "user@example.com"     # Email for job notifications
+  email_type: "ALL"             # Notification types: NONE, BEGIN, END, FAIL, ALL
+
+# Container paths (Singularity)
+containers:
+  # RFdiffusion (base model)
+  rfdiffusion: "/path/to/containers/rfdiffusion.sif"
+
+  # RFdiffusion all-atom
+  rfdiffusion_aa: "/path/to/containers/rf_se3_diffusion.sif"
+
+  # LigandMPNN + Rosetta FastRelax
+  seqdesign: "/path/to/containers/ligandmpnn_rosetta.sif"
+
+  # ColabFold
+  folding: "/path/to/containers/colabfold_1.5.5-cuda12.2.2.sif"
+
+# Container bind mounts
+# Format: "/host/path:/container/path"
+binds:
+  - "/data:/data"
+  - "/scratch:/scratch"
+  - "/path/to/colabfold_weights:/cache"
+
+# Stage-specific resource requirements
+stages:
+  # Stage 1: RFdiffusion
+  diffusion:
+    time: "01:00:00"    # Wall time limit
+    mem: "4000"         # Memory in MB
+    cpus: 2             # CPUs per task
+    gpus: "a30:1"       # GPU specification (type:count)
+
+  # Stage 2: Sequence Design (LigandMPNN + FastRelax)
+  seqdesign:
+    time: "03:00:00"
+    mem: "8000"
+    cpus: 9             # Higher for parallel FastRelax
+    gpus: "a30:1"
+
+  # Stage 3: Forward Folding (ColabFold)
+  folding:
+    time: "01:00:00"
+    mem: "4000"
+    cpus: 2
+    gpus: "a30:1"
+
+# Advanced options (optional)
+advanced:
+  # Custom SBATCH arguments per stage
+  diffusion_sbatch:
+    account: "myproject"
+    qos: "normal"
+
+  seqdesign_sbatch:
+    account: "myproject"
+    qos: "normal"
+
+  folding_sbatch:
+    account: "myproject"
+    qos: "normal"

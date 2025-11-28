@@ -1,0 +1,246 @@
+# Advanced Guide Potentials Example
+# Demonstrates all available guide potentials for fine-tuned control
+#
+# Use this as a reference for advanced enzyme design projects
+# where you need precise control over the design process.
+
+name: "advanced_enzyme"
+output_dir: "outputs/advanced"
+
+substrate:
+  smiles: "C1=CC=C(C=C1)C(=O)O"  # Benzoic acid
+  name: "BZA"
+  pdb_file: "data/substrates/benzoic_acid.pdb"
+
+active_site:
+  reference_pdb: "data/references/reference.pdb"
+  reference_chain: "A"
+  motif_residues: ["A45", "A72", "A105", "A130"]
+
+scaffold:
+  min_size: 150
+  max_size: 200
+  target_size: 175
+
+diffusion:
+  type: "all-atom"
+  num_designs: 200
+  iterations: 100
+  noise_scale: 1.0
+
+  enzyme_design: true
+
+  # ========================================
+  # ALL AVAILABLE GUIDE POTENTIALS
+  # ========================================
+
+  guide_potentials:
+    # 1. Substrate Contacts
+    # Ensures sufficient contacts between enzyme and substrate
+    - type: "substrate_contacts"
+      weight: 5.0
+      min_contacts: 10  # Minimum number of contacts
+      max_distance: 4.5  # Angstrom cutoff
+      residues: ["A45", "A72", "A105"]  # Specific residues (optional)
+      exclude_backbone: false  # Include backbone atoms
+
+    # 2. Catalytic Geometry
+    # Enforces precise geometric constraints for catalysis
+    - type: "catalytic_geometry"
+      weight: 15.0
+      target_distance: 3.5  # Angstrom
+      target_angle: 109.5  # Degrees (tetrahedral)
+      tolerance: 0.5  # Allowed deviation
+      atom_pairs:  # Specific atom pairs (optional)
+        - ["A45:OG", "substrate:C1"]
+        - ["A72:NE2", "substrate:O1"]
+
+    # 3. Binding Pocket Shape
+    # Controls pocket volume and properties
+    - type: "binding_pocket"
+      weight: 4.0
+      pocket_volume: 1000  # Angstrom^3
+      pocket_depth: 8.0  # Angstrom
+      hydrophobic_ratio: 0.5  # 0=all polar, 1=all hydrophobic
+      shape_complementarity: 0.7  # 0=loose, 1=tight fit
+
+    # 4. Electrostatic Complementarity
+    # Matches charges between enzyme and substrate
+    - type: "electrostatic"
+      weight: 3.0
+      target_charge: -1.0  # Overall pocket charge
+      ph: 7.4
+      ionic_strength: 0.15  # M
+      complementarity: true  # Match substrate charge distribution
+
+    # 5. Hydrophobic Packing
+    # Optimizes hydrophobic interactions
+    - type: "hydrophobic_packing"
+      weight: 2.0
+      min_buried_area: 500  # Angstrom^2
+      packing_density: 0.74  # van der Waals packing
+      target_residues: ["VAL", "LEU", "ILE", "PHE"]
+
+    # 6. Hydrogen Bonding Network
+    # Enforces H-bond network in active site
+    - type: "hbond_network"
+      weight: 6.0
+      min_hbonds: 5
+      max_distance: 3.5  # Angstrom
+      angle_cutoff: 20.0  # Degrees from ideal
+      include_backbone: true
+      cooperative: true  # Favor H-bond networks
+
+    # 7. Secondary Structure Bias
+    # Prefers specific secondary structure near active site
+    - type: "secondary_structure"
+      weight: 2.0
+      target_ss: "HHHEEELLL"  # H=helix, E=sheet, L=loop
+      residue_range: [40, 48]
+      strict: false  # Allow some flexibility
+
+    # 8. Metal Coordination (if metalloenzyme)
+    - type: "metal_coordination"
+      weight: 10.0
+      metal: "Zn"
+      coordination_number: 4
+      geometry: "tetrahedral"  # or "octahedral", "square_planar"
+      ligands: ["HIS", "HIS", "GLU", "water"]
+      bond_lengths: [2.0, 2.0, 2.1, 2.0]  # Angstrom
+
+    # 9. Conformational Sampling
+    # Samples substrate conformations
+    - type: "conformational_sampling"
+      weight: 1.0
+      num_conformers: 10
+      energy_window: 3.0  # kcal/mol
+      rmsd_cutoff: 1.0  # Angstrom
+
+    # 10. Solvent Accessibility
+    # Controls exposure of active site
+    - type: "solvent_accessibility"
+      weight: 1.5
+      buried_fraction: 0.7  # Fraction of substrate buried
+      exclude_residues: ["A45"]  # Keep catalytic residues buried
+
+    # 11. Disulfide Bonds (for stability)
+    - type: "disulfide"
+      weight: 3.0
+      min_distance: 5.5  # Angstrom
+      max_distance: 8.0
+      target_pairs:
+        - ["A30", "A120"]
+        - ["A60", "A150"]
+
+    # 12. Loop Geometry (for active site loops)
+    - type: "loop_geometry"
+      weight: 2.0
+      loop_ranges:
+        - [42, 48]  # Active site loop
+        - [70, 76]  # Binding loop
+      max_b_factor: 40.0
+      min_contacts: 3  # Contacts to rest of protein
+
+    # 13. Cavity Complementarity
+    # Shape matching for substrate binding
+    - type: "cavity_complementarity"
+      weight: 4.0
+      shape_matching: 0.8
+      volume_ratio: 1.1  # Cavity/substrate volume
+      probe_radius: 1.4  # Angstrom
+
+    # 14. Aromatic Stacking (for aromatic substrates)
+    - type: "aromatic_stacking"
+      weight: 2.5
+      min_stacks: 2
+      distance_range: [3.3, 3.8]  # Angstrom
+      angle_cutoff: 30.0  # Degrees
+      residues: ["PHE", "TRP", "TYR"]
+
+    # 15. Protein Stability
+    # Global stability metrics
+    - type: "stability"
+      weight: 1.0
+      target_energy: -500.0  # Rosetta energy units
+      buried_hydrophobics: 0.8  # Fraction buried
+      salt_bridges: 5  # Minimum salt bridges
+
+# Sequence design with advanced settings
+sequence_design:
+  model_type: "ligand_mpnn"
+  num_sequences: 20
+  temperature: 0.1
+
+  # Advanced filtering
+  filtering:
+    motif_rmsd_cutoff: 1.0
+    clash_cutoff: 1.5
+    min_substrate_contacts: 12
+    max_substrate_distance: 4.0
+
+    # Additional filters
+    min_binding_energy: -8.0  # kcal/mol
+    max_active_site_rmsd: 2.0
+    min_sequence_diversity: 0.3  # Hamming distance
+
+  # Extensive FastRelax
+  relax_design_cycles: 5
+
+  # Custom Rosetta constraints
+  params_file: "data/params/substrate.params"
+  cst_file: "data/constraints/advanced.cst"
+
+  # Fine-tune design regions
+  design_regions:
+    - [40, 50]   # Active site region 1
+    - [70, 80]   # Active site region 2
+    - [100, 110] # Active site region 3
+  repack_regions:
+    - [1, 39]
+    - [51, 69]
+    - [81, 99]
+    - [111, 200]
+
+folding:
+  num_recycles: 10
+  num_models: 5
+  msa_mode: "single_sequence"
+  min_plddt: 80
+  min_pae: 5
+
+compute:
+  rfdiffusion_path: "/opt/RFdiffusion"
+  rfdiffusion_aa_path: "/opt/rf_diffusion_all_atom"
+  ligandmpnn_path: "/opt/LigandMPNN"
+  num_workers: 16
+
+output:
+  save_intermediates: true
+  save_plots: true
+  save_trajectories: true
+  top_designs: 20
+
+  # Extensive analysis
+  analysis:
+    - "binding_energy"
+    - "stability"
+    - "catalytic_geometry"
+    - "sequence_diversity"
+    - "structural_quality"
+    - "pocket_properties"
+
+# Post-processing
+post_processing:
+  # Clustering
+  cluster_designs: true
+  cluster_cutoff: 2.0  # Angstrom RMSD
+
+  # Ranking
+  ranking_weights:
+    binding_energy: 0.3
+    plddt: 0.2
+    catalytic_geometry: 0.3
+    stability: 0.2
+
+  # Export
+  export_top_clusters: 5

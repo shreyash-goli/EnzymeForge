@@ -1,0 +1,146 @@
+# PFAS Degradation Enzyme Design
+# Design a defluorinase for breaking C-F bonds in perfluorooctanoic acid (PFOA)
+#
+# Catalytic mechanism: Nucleophilic substitution
+# Target: C-F bond cleavage in PFOA
+# Reference: Lactonase-like scaffold
+
+name: "pfas_defluorinase"
+output_dir: "outputs/pfas_design"
+
+# Substrate configuration
+substrate:
+  # PFOA SMILES
+  smiles: "C(C(C(C(C(C(C(C(F)(F)F)(F)F)(F)F)(F)F)(F)F)(F)F)(F)F)(=O)O"
+  name: "PFOA"
+  pdb_file: "data/substrates/pfoa.pdb"  # Pre-generated 3D structure
+  functional_groups:
+    - "carboxylic_acid"
+    - "perfluoroalkyl"
+
+  # Catalytic mechanism
+  mechanism: "dehalogenation"
+  target_bonds:
+    - ["C1", "F1"]  # Primary C-F bond to cleave
+
+# Active site configuration
+active_site:
+  # Reference structure for motif (if available)
+  reference_pdb: "data/references/lactonase.pdb"
+  reference_chain: "A"
+
+  # Catalytic motif residues
+  # Format: chain + residue number (e.g., A45 = chain A, residue 45)
+  motif_residues:
+    - "A45"  # Nucleophile (e.g., Ser/Cys)
+    - "A72"  # General base (e.g., His)
+    - "A105" # Oxyanion hole (e.g., Asn)
+
+  # Suggested catalytic residues (will be auto-generated if not specified)
+  catalytic_residues:
+    nucleophile: ["SER", "CYS"]
+    general_base: ["HIS", "GLU"]
+    oxyanion_hole: ["ASN", "GLN"]
+
+  # Binding pocket requirements
+  pocket:
+    hydrophobic: true  # Accommodate perfluoroalkyl chain
+    charged: false
+    polar: true  # For carboxylate group
+
+# Scaffold configuration
+scaffold:
+  # Size of designed protein
+  min_size: 120
+  max_size: 180
+  target_size: 150
+
+  # Secondary structure preferences
+  secondary_structure:
+    alpha_helix: 0.4
+    beta_sheet: 0.3
+    loop: 0.3
+
+  # Topology
+  topology: "alpha_beta"  # Mixed alpha/beta
+
+# RFdiffusion configuration
+diffusion:
+  # Use all-atom diffusion for better ligand placement
+  type: "all-atom"
+
+  # Number of designs to generate
+  num_designs: 100
+
+  # Diffusion parameters
+  iterations: 50
+  noise_scale: 1.0
+
+  # Contigs will be auto-generated from scaffold config
+  # Format: A45-45/0 A72-72/0 A105-105/0 150-180
+
+  # Guide potentials for enzyme design
+  enzyme_design: true
+  guide_potentials:
+    - type: "substrate_contacts"
+      weight: 5.0
+      min_contacts: 8
+      max_distance: 4.5
+
+    - type: "catalytic_geometry"
+      weight: 10.0
+      target_distance: 3.5  # Nucleophile to substrate distance
+      tolerance: 0.5
+
+    - type: "binding_pocket"
+      weight: 3.0
+      pocket_volume: 800  # Angstrom^3
+      hydrophobic_ratio: 0.6
+
+# Sequence design configuration
+sequence_design:
+  model_type: "ligand_mpnn"
+  num_sequences: 10
+  temperature: 0.1
+  seed: 42
+
+  # Filtering criteria
+  filtering:
+    motif_rmsd_cutoff: 2.0  # Angstrom
+    clash_cutoff: 2.0  # Angstrom for backbone-ligand clashes
+
+  # FastRelax cycles
+  relax_design_cycles: 2
+
+  # Rosetta parameters
+  params_file: "data/params/pfoa.params"  # Ligand parameters
+  cst_file: "data/constraints/pfas_catalytic.cst"  # Catalytic constraints
+
+# Structure prediction configuration
+folding:
+  num_recycles: 3
+  num_models: 5
+  msa_mode: "single_sequence"
+
+  # Metrics
+  min_plddt: 70
+  min_pae: 10
+
+# Computational resources
+compute:
+  # Paths to software
+  rfdiffusion_path: "/opt/RFdiffusion"
+  rfdiffusion_aa_path: "/opt/rf_diffusion_all_atom"
+  ligandmpnn_path: "/opt/LigandMPNN"
+
+  # ColabFold
+  colabfold_command: "colabfold_batch"
+
+  # Parallel execution
+  num_workers: 8
+
+# Output configuration
+output:
+  save_intermediates: true
+  save_plots: true
+  top_designs: 10
